@@ -22,6 +22,7 @@ const ICON = {
   fwd10: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.4-5.7M20 4v4h-4"/></svg>',
   trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13"/></svg>',
   close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  share: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3.5M7.5 8 12 3.5 16.5 8"/><path d="M8 11H6v9.5h12V11h-2"/></svg>',
   file: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6Z"/><path d="M14 3v4h4M9 13h6M9 17h6"/></svg>',
 };
 
@@ -528,6 +529,39 @@ function render() {
   else renderLibrary();
 }
 
+// ---------- sharing the app ----------
+
+const APP_URL = new URL('./', location.href).href;
+
+/** The system's share menu where there is one; elsewhere the link is copied. */
+async function shareApp() {
+  const data = { title: 'Lektor', text: t('shareText'), url: APP_URL };
+  if (navigator.share && (!navigator.canShare || navigator.canShare(data))) {
+    try {
+      await navigator.share(data);
+      return;
+    } catch (err) {
+      if (err?.name === 'AbortError') return; // closed by the user
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(APP_URL);
+    toast(t('linkCopied', { url: APP_URL }));
+  } catch {
+    toast(t('linkIs', { url: APP_URL }), 8000);
+  }
+}
+
+let toastTimer = 0;
+
+function toast(text, ms = 4000) {
+  const el = document.getElementById('toast');
+  el.textContent = text;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (el.hidden = true), ms);
+}
+
 // PL | EN in the header of every screen.
 function langSwitch() {
   const names = { pl: 'Polski', en: 'English' };
@@ -575,7 +609,7 @@ function renderLibrary() {
   app.innerHTML = `
     <header class="bar">
       <h1>Lektor</h1>
-      <div class="bar-actions">${langSwitch()}<button class="icon-btn" data-settings aria-label="${t('settings')}">${ICON.gear}</button></div>
+      <div class="bar-actions">${langSwitch()}<button class="icon-btn" data-share aria-label="${t('shareApp')}" title="${t('shareApp')}">${ICON.share}</button><button class="icon-btn" data-settings aria-label="${t('settings')}">${ICON.gear}</button></div>
     </header>
     <section class="open-box" id="drop">
       <p class="lead">${t('lead')}</p>
@@ -746,6 +780,7 @@ function renderSettings() {
           : ''
       }
       <p class="hint">${t('voicesHint')}</p>
+      <button type="button" class="btn" data-share>${ICON.share}<span>${t('shareApp')}</span></button>
     </form>`;
 }
 
@@ -766,6 +801,8 @@ app.addEventListener('click', (e) => {
     render();
   } else if (el.dataset.uiLang) {
     switchLanguage(el.dataset.uiLang);
+  } else if ('share' in el.dataset) {
+    shareApp();
   } else if ('settings' in el.dataset) {
     renderSettings();
     sheet.showModal();
@@ -837,6 +874,10 @@ bar.addEventListener('submit', (e) => {
 
 app.addEventListener('change', (e) => {
   if (e.target.id === 'file' && e.target.files[0]) importBlob(e.target.files[0], e.target.files[0].name);
+});
+
+sheet.addEventListener('click', (e) => {
+  if (e.target.closest('[data-share]')) shareApp();
 });
 
 sheet.addEventListener('change', (e) => {

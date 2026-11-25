@@ -73,6 +73,11 @@ export const MESSAGES = {
     pause: 'Pauza',
     play: 'Czytaj',
     speed: 'Tempo',
+    // sharing the app
+    shareApp: 'Udostępnij Lektora',
+    shareText: 'Lektor czyta na głos PDF-y: artykuły i prace dyplomowe, całe albo wybrany rozdział.',
+    linkCopied: 'Skopiowano link: {url}',
+    linkIs: 'Link do Lektora: {url}',
     // kinds of skipped text
     'kind.caption': 'podpis',
     'kind.note': 'przypis',
@@ -167,6 +172,10 @@ export const MESSAGES = {
     pause: 'Pause',
     play: 'Read',
     speed: 'Speed',
+    shareApp: 'Share Lektor',
+    shareText: 'Lektor reads PDFs aloud: papers and theses, whole or one chapter at a time.',
+    linkCopied: 'Link copied: {url}',
+    linkIs: 'Lektor’s link: {url}',
     'kind.caption': 'caption',
     'kind.note': 'note',
     'kind.table': 'table',

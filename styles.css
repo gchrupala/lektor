@@ -180,6 +180,30 @@ select {
   color: var(--accent-text);
 }
 
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  z-index: 20;
+  transform: translateX(-50%);
+  max-width: min(520px, calc(100% - 32px));
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.2);
+}
+
+#toast[hidden] {
+  display: none;
+}
+
+.settings > .btn {
+  align-self: flex-start;
+}
+
 .icon-btn.listening {
   background: var(--danger);
   color: #fff;
