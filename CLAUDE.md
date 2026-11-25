@@ -17,3 +17,4 @@ Aplikacja webowa (PWA), która czyta na głos PDF-y (artykuły, prace dyplomowe)
 - Timery w przeglądarce owijaj w funkcje strzałkowe: `setTimeout` wywołany jako metoda innego obiektu rzuca „Illegal invocation” (w Node nie).
 - PDF-y i ustawienia zostają na urządzeniu; nic nie jest wysyłane.
 - Przed wypchnięciem: `npm test`.
+- Strona działa pod https://grzegorz.chrupala.me/lektor/ (GitHub Pages z gałęzi `main`). Po każdej poprawce: `npm test`, wypchnij gałąź roboczą i od razu zaktualizuj `main` (fast-forward, bez pytania), potem sprawdź, że strona ma nową wersję (`VERSION` w `sw.js`).
