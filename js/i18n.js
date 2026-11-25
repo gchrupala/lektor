@@ -81,8 +81,6 @@ export const MESSAGES = {
     'kind.toc': 'spis',
     'kind.front': 'strona tytułowa',
     // settings
-    interfaceLang: 'Język / Language',
-    automatic: 'automatycznie ({lang})',
     voice: 'Głos',
     voiceFor: 'Głos (język dokumentu: {lang})',
     noVoices: 'Brak głosów w systemie',
@@ -175,8 +173,6 @@ export const MESSAGES = {
     'kind.math': 'equation',
     'kind.toc': 'contents',
     'kind.front': 'title page',
-    interfaceLang: 'Język / Language',
-    automatic: 'automatic ({lang})',
     voice: 'Voice',
     voiceFor: 'Voice (document language: {lang})',
     noVoices: 'No voices on this system',

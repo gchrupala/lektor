@@ -527,6 +527,23 @@ function render() {
   else renderLibrary();
 }
 
+// PL | EN in the header of every screen.
+function langSwitch() {
+  const names = { pl: 'Polski', en: 'English' };
+  return `<div class="lang-switch" role="group" aria-label="Język / Language">${['pl', 'en']
+    .map((l) => `<button data-ui-lang="${l}" lang="${l}" aria-label="${names[l]}" aria-pressed="${l === language()}">${l.toUpperCase()}</button>`)
+    .join('')}</div>`;
+}
+
+function switchLanguage(l) {
+  if (l === language()) return;
+  prefs.uiLang = l;
+  savePrefs();
+  applyLanguage();
+  render();
+  if (sheet.open) renderSettings();
+}
+
 function renderLibrary() {
   bar.hidden = true;
   document.title = 'Lektor';
@@ -557,7 +574,7 @@ function renderLibrary() {
   app.innerHTML = `
     <header class="bar">
       <h1>Lektor</h1>
-      <div class="bar-actions"><button class="icon-btn" data-settings aria-label="${t('settings')}">${ICON.gear}</button></div>
+      <div class="bar-actions">${langSwitch()}<button class="icon-btn" data-settings aria-label="${t('settings')}">${ICON.gear}</button></div>
     </header>
     <section class="open-box" id="drop">
       <p class="lead">${t('lead')}</p>
@@ -587,6 +604,7 @@ function renderReader() {
       <div class="doc-head"><h1 title="${esc(record.title)}">${esc(record.title)}</h1>
         <span class="doc-meta">${esc(t('docMeta', { pages: record.model.pages, lang: languageName(record.model.lang) || t('unknownLang'), sections: record.model.sections.length }))}</span></div>
       <div class="bar-actions">
+        ${langSwitch()}
         <button class="icon-btn" data-toc aria-label="${t('contents')}">${ICON.list}</button>
         <button class="icon-btn" data-settings aria-label="${t('settings')}">${ICON.gear}</button>
       </div>
@@ -693,13 +711,6 @@ function renderSettings() {
   sheet.innerHTML = `
     <form method="dialog" class="settings">
       <div class="sheet-head"><h2>${t('settings')}</h2><button class="icon-btn" value="close" aria-label="${t('close')}">${ICON.close}</button></div>
-      <label class="field"><span>${t('interfaceLang')}</span>
-        <select id="ui-lang">
-          ${[['', t('automatic', { lang: languageName(chooseLanguage('', navigator.language)) })], ['pl', 'Polski'], ['en', 'English']]
-            .map(([v, l]) => `<option value="${v}"${prefs.uiLang === v ? ' selected' : ''}>${esc(l)}</option>`)
-            .join('')}
-        </select>
-      </label>
       <label class="field"><span>${ui.record ? esc(t('voiceFor', { lang: languageName(lang) })) : t('voice')}</span>
         <select id="voice">
           ${voices.length ? '' : `<option value="">${t('noVoices')}</option>`}
@@ -751,6 +762,8 @@ app.addEventListener('click', (e) => {
   } else if ('cancel' in el.dataset) {
     ui.confirmDelete = null;
     render();
+  } else if (el.dataset.uiLang) {
+    switchLanguage(el.dataset.uiLang);
   } else if ('settings' in el.dataset) {
     renderSettings();
     sheet.showModal();
@@ -834,12 +847,6 @@ sheet.addEventListener('change', (e) => {
       // Let the new voice say something.
       player.play(player.index, { end: player.index + 1 });
     }
-  } else if (el.id === 'ui-lang') {
-    prefs.uiLang = el.value;
-    savePrefs();
-    applyLanguage();
-    renderSettings();
-    render();
   } else if (el.id === 'ask-lang') {
     prefs.askLang = el.value;
     savePrefs();

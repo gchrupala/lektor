@@ -107,11 +107,16 @@ select {
   min-width: 0;
 }
 
-.doc-head h1 {
-  font-size: 1.1rem;
+.doc-head h1,
+.doc-head .doc-meta {
+  display: block;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.doc-head h1 {
+  font-size: 1.1rem;
 }
 
 .doc-meta {
@@ -145,6 +150,34 @@ select {
 .icon-btn.small svg {
   width: 18px;
   height: 18px;
+}
+
+.lang-switch {
+  display: inline-flex;
+  align-self: center;
+  margin-right: 4px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.lang-switch button {
+  min-width: 34px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font: 700 0.8rem/1 var(--sans);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.lang-switch button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-text);
 }
 
 .icon-btn.listening {
