@@ -340,7 +340,8 @@ function ask(text) {
     ui.suggestions = r.suggestions;
     setAnswer(t(r.suggestions.length ? 'notFoundSuggest' : 'notFound', { q }));
     renderAsk();
-    if (!r.suggestions.length && doc.sections.length) openToc();
+    // The contents open with the message on top, so the listener sees what was heard.
+    if (!r.suggestions.length && doc.sections.length) openToc(ui.answer);
   }
 }
 
@@ -395,7 +396,7 @@ function listen() {
     if (input) input.value = result[0].transcript;
     if (!result.isFinal) return;
     // The first alternative that names something in the document.
-    const alts = [...result].map((a) => a.transcript);
+    const alts = Array.from({ length: result.length }, (_, i) => result[i].transcript);
     const hit = alts.find((a) => interpret(a, ui.record.model).type !== 'none') ?? alts[0];
     if (input) input.value = hit;
     ask(hit);
@@ -633,7 +634,7 @@ function renderAsk() {
     </form>`;
 }
 
-function openToc() {
+function openToc(note = '') {
   const doc = ui.record.model;
   const cur = currentSection();
   const items = doc.sections
@@ -646,6 +647,7 @@ function openToc() {
     <div class="toc">
       <div class="sheet-head"><h2>${t('contents')}</h2>
         <span><button class="btn small" data-from-start>${t('fromStart')}</button><button class="icon-btn" data-close aria-label="${t('close')}">${ICON.close}</button></span></div>
+      ${note ? `<p class="answer" role="status">${esc(note)}</p>` : ''}
       ${items ? `<ul>${items}</ul>` : `<p class="empty">${t('noContents')}</p>`}
       <p class="hint">${t(doc.outline ? 'fromOutline' : 'fromLook')} ${t(prefs.stopAtEnd ? 'tapToEnd' : 'tap')}</p>
     </div>`;

@@ -208,28 +208,36 @@ export function nameScore(query, name) {
 }
 
 function alternatives(name) {
-  const group = SYNONYMS.find((g) => g.some((s) => nameScore(name, s) >= 0.85));
+  // 0.75 lets inflected forms in: "o wynikach" -> results, "metodach" -> methods.
+  const group = SYNONYMS.find((g) => g.some((s) => nameScore(name, s) >= 0.75));
   return group ? [name, ...group.filter((s) => s !== name)] : [name];
 }
 
 const FRONT_BACK = new Set(
   [...SYNONYMS[0], ...SYNONYMS[11], ...SYNONYMS[12], ...SYNONYMS[13], ...SYNONYMS[14], ...SYNONYMS[15]].concat(
-    ['declaration', 'dedication', 'publications', 'list of figures', 'list of tables', 'acronyms', 'abbreviations', 'index', 'curriculum vitae', 'about the author', 'listings', 'colophon', 'glossary', 'nomenclature', 'oswiadczenie', 'dedykacja', 'indeks', 'skorowidz'].map(normalize),
+    ['declaration', 'dedication', 'publications', 'list of figures', 'list of tables', 'acronyms', 'abbreviations', 'index', 'curriculum vitae', 'about the author', 'listings', 'colophon', 'glossary', 'nomenclature', 'preamble', 'keywords', 'key words', 'propositions', 'stellingen', 'oswiadczenie', 'dedykacja', 'slowa kluczowe', 'indeks', 'skorowidz'].map(normalize),
   ),
 );
 
 const isPart = (s) => /^(?:part|część|czesc|deel|teil)\b/i.test(s.t);
+const isAppendix = (s) => /^(?:appendix|appendices|dodatek|aneks|załącznik|bijlage|anhang)\b/i.test(s.t);
+const isChapterLike = (s) => !isPart(s) && !isAppendix(s) && !FRONT_BACK.has(headingName(s.t));
 
-/** The level of chapters: 1, or 2 when the document is divided into parts. */
+/**
+ * The level of chapters: the highest level with at least two of them. Not
+ * always 1: parts sit above chapters, and many PDFs put the whole document
+ * under one bookmark with its title.
+ */
 export function chapterLevel(doc) {
-  const parts = doc.sections.filter(isPart);
-  return parts.length && parts.every((s) => s.l === 1) && doc.sections.some((s) => s.l === 2) ? 2 : 1;
+  const levels = [...new Set(doc.sections.map((s) => s.l))].sort((a, b) => a - b);
+  return levels.find((l) => doc.sections.filter((s) => s.l === l && isChapterLike(s)).length >= 2) ?? levels[0] ?? 1;
 }
 
 function byNumber(doc, kind, numbers, letter) {
   const secs = doc.sections;
   const wanted = letter ? [letter, ...numbers].join('.') : numbers.join('.');
   if (!wanted) return null;
+  const level = chapterLevel(doc);
   const candidates = secs
     .map((s, i) => ({ s, i }))
     .filter(({ s }) => {
@@ -237,11 +245,14 @@ function byNumber(doc, kind, numbers, letter) {
       const n = s.n.toUpperCase();
       if (kind === 'part') return isPart(s) && (n === wanted || n === roman(Number(wanted)));
       if (kind === 'appendix') return /^[A-Z]/.test(n) && n === wanted;
-      if (kind === 'chapter' && /^[A-Z]$/.test(n)) return false;
-      if (kind === 'chapter') return !isPart(s) && n === wanted;
-      return n === wanted || (numbers.length === 1 && /^[IVX]+$/.test(n) && !isPart(s) && n === roman(numbers[0]));
+      // "Rozdział III" is chapter 3.
+      const asRoman = numbers.length === 1 && /^[IVX]+$/.test(n) && n === roman(numbers[0]);
+      if (kind === 'chapter' && /^[A-Z]$/.test(n) && !asRoman) return false; // appendix A
+      if (kind === 'chapter') return !isPart(s) && (n === wanted || asRoman);
+      return n === wanted || (asRoman && !isPart(s));
     })
-    .sort((a, b) => a.s.l - b.s.l);
+    // Chapters first, then higher levels.
+    .sort((a, b) => (a.s.l === level ? 0 : 1) - (b.s.l === level ? 0 : 1) || a.s.l - b.s.l);
   if (candidates.length) return candidates[0].i;
   // "A Questionnaires" under an appendix part.
   if (kind === 'appendix' && letter && !numbers.length) {
@@ -250,18 +261,11 @@ function byNumber(doc, kind, numbers, letter) {
   }
   // Unnumbered chapters and parts: counted in order, without front and back matter.
   if (numbers.length === 1 && (kind === 'chapter' || kind === 'part' || kind === 'appendix')) {
-    const level = kind === 'part' ? 1 : chapterLevel(doc);
     const list = secs
       .map((s, i) => ({ s, i }))
-      .filter(({ s }) =>
-        kind === 'part'
-          ? isPart(s)
-          : kind === 'appendix'
-            ? /^(?:appendix|dodatek|aneks|załącznik|bijlage|anhang)\b/i.test(s.t)
-            : s.l === level && !isPart(s) && !FRONT_BACK.has(headingName(s.t)) && !/^(?:appendix|dodatek|aneks)\b/i.test(s.t),
-      );
+      .filter(({ s }) => (kind === 'part' ? isPart(s) : kind === 'appendix' ? isAppendix(s) : s.l === level && isChapterLike(s)));
     // Where chapters are numbered, only numbered ones count ("Colophon" is not the last chapter).
-    const numbered = list.filter(({ s }) => /^\d+$/.test(s.n || ''));
+    const numbered = list.filter(({ s }) => /^(?:\d+|[IVXLC]+)$/.test(s.n || ''));
     const pick = numbered.length && kind === 'chapter' ? numbered : list.filter(({ s }) => !/^[A-Z]\s+\p{Lu}/u.test(s.t));
     const k = numbers[0] === -1 ? pick.length - 1 : numbers[0] - 1;
     if (pick[k]) return pick[k].i;

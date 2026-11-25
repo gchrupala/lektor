@@ -56,6 +56,26 @@ test('chapters by number, ordinal and word, in Polish and English', () => {
   assert.equal(ask('part 1', thesis), 'Part I. Background');
 });
 
+test('chapters under a title bookmark, and in Roman numerals', () => {
+  const wrapped = {
+    pages: 90,
+    labels: null,
+    sections: [section('My Thesis', 1), section('Abstract', 2), section('Introduction', 2), section('Background', 3), section('Methods', 2), section('Results', 2), section('Discussion', 2), section('References', 2)],
+  };
+  assert.equal(ask('chapter 3', wrapped), 'Results');
+  assert.equal(ask('przejdź do rozdziału trzeciego', wrapped), 'Results');
+  assert.equal(ask('ostatni rozdział', wrapped), 'Discussion');
+  const roman = {
+    pages: 90,
+    labels: null,
+    sections: [section('Wstęp', 1), section('Rozdział I. Teoria', 1, 'I'), section('Rozdział II. Metoda', 1, 'II'), section('Rozdział III. Wyniki', 1, 'III'), section('Zakończenie', 1)],
+  };
+  assert.equal(ask('rozdział 1', roman), 'Rozdział I. Teoria');
+  assert.equal(ask('rozdział trzeci', roman), 'Rozdział III. Wyniki');
+  assert.equal(ask('the first chapter', roman), 'Rozdział I. Teoria');
+  assert.equal(ask('ostatni rozdział', roman), 'Rozdział III. Wyniki');
+});
+
 test('sections by number, spoken or typed', () => {
   assert.equal(ask('3.2'), '3.2 Attention');
   assert.equal(ask('3,2'), '3.2 Attention');
@@ -76,6 +96,9 @@ test('sections by name, with synonyms across languages and small mistakes', () =
   assert.equal(ask('encoders'), '3.1 Encoder and Decoder Stacks');
   assert.equal(ask('experiment two'), '4 Experiment Two: Symmetric Functions');
   assert.equal(ask('listening', thesis), 'Listening to Papers');
+  // Polish word forms find English names.
+  assert.equal(ask('przeczytaj o wnioskach'), '5 Conclusion');
+  assert.equal(ask('rozdział o powiązanych pracach'), '2 Related Work');
 });
 
 test('pages by printed number, and commands', () => {
