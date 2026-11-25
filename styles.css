@@ -486,9 +486,7 @@ input[type='text']:focus {
   padding-left: 8px;
 }
 
-.skipped .tag,
-.k-caption:not(.skipped)::before,
-.k-note:not(.skipped)::before {
+.text .tag {
   margin-right: 6px;
   padding: 0 6px;
   border-radius: 4px;
@@ -504,13 +502,6 @@ input[type='text']:focus {
   color: var(--muted);
 }
 
-.text .k-caption:not(.skipped)::before {
-  content: 'podpis';
-}
-
-.text .k-note:not(.skipped)::before {
-  content: 'przypis';
-}
 
 /* ---------- player ---------- */
 

@@ -3,7 +3,7 @@
 // Bump VERSION with every change to the app files. The browser then installs
 // this worker again with the new files, and the page reloads into them
 // (see the controllerchange handler in js/app.js).
-const VERSION = 'v1';
+const VERSION = 'v2';
 const APP_CACHE = `lektor-app-${VERSION}`;
 const SHARE_CACHE = 'lektor-share';
 const APP_FILES = [
@@ -11,6 +11,7 @@ const APP_FILES = [
   'index.html',
   'styles.css',
   'js/app.js',
+  'js/i18n.js',
   'js/pdfread.js',
   'js/layout.js',
   'js/speech.js',

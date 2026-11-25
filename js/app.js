@@ -7,6 +7,7 @@ import { DEFAULT_OPTIONS, pieces, plan, readable, sectionEnd } from './speech.js
 import { interpret, pdfUrl } from './navigate.js';
 import { Player, pickVoice } from './player.js';
 import * as L from './library.js';
+import { chooseLanguage, decimal, language, languageName, setLanguage, t } from './i18n.js';
 
 const ICON = {
   back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7"/></svg>',
@@ -24,15 +25,6 @@ const ICON = {
   file: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6Z"/><path d="M14 3v4h4M9 13h6M9 17h6"/></svg>',
 };
 
-const KIND_LABEL = {
-  caption: 'podpis',
-  note: 'przypis',
-  table: 'tabela',
-  math: 'wzór',
-  toc: 'spis',
-  front: 'nagłówek strony tytułowej',
-};
-const LANG_NAMES = { en: 'angielski', pl: 'polski', nl: 'niderlandzki', de: 'niemiecki', fr: 'francuski', es: 'hiszpański', it: 'włoski' };
 const RATES = [0.8, 0.9, 1, 1.1, 1.25, 1.4, 1.6, 1.8, 2];
 
 // ---------- preferences (this device only) ----------
@@ -45,8 +37,15 @@ const prefs = {
   stopAtEnd: true, // a chosen section is read to its end, then reading stops
   keepAwake: true,
   askLang: '', // language of spoken requests; '' = the browser's
+  uiLang: '', // 'pl' | 'en'; '' = from the browser
   ...readJson(PREFS_KEY),
 };
+
+function applyLanguage() {
+  setLanguage(chooseLanguage(prefs.uiLang, navigator.language));
+  document.documentElement.lang = language();
+}
+applyLanguage();
 
 function readJson(key) {
   try {
@@ -97,8 +96,8 @@ const player = new Player({
   makeUtterance: (text) => new SpeechSynthesisUtterance(text),
   onChange: () => onPlayerChange(),
   onError: (error) => {
-    if (error === 'not-allowed') setAnswer('Przeglądarka zatrzymała czytanie. Naciśnij ▶, żeby czytać dalej.');
-    else if (error === 'synthesis-unavailable' || error === 'voice-unavailable') setAnswer('Głos jest niedostępny. Wybierz inny w ustawieniach.');
+    if (error === 'not-allowed') setAnswer(t('notAllowed'));
+    else if (error === 'synthesis-unavailable' || error === 'voice-unavailable') setAnswer(t('voiceUnavailable'));
   },
 });
 player.setRate(prefs.rate);
@@ -110,7 +109,7 @@ async function refreshLibrary() {
     ui.docs = await L.listDocs();
   } catch {
     ui.docs = [];
-    ui.error = 'Ta przeglądarka nie pozwala zapisywać plików (tryb prywatny?). PDF da się otworzyć, ale nie zostanie zapamiętany.';
+    ui.error = t('noStorage');
   }
 }
 
@@ -119,17 +118,17 @@ const isPdf = (bytes) => bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 
 async function parse(bytes) {
   const raw = await readPdf(bytes.slice(), {
     onProgress: (n, total) => {
-      if (n === 1 || n % 5 === 0 || n === total) showBusy(`Czytam PDF: strona ${n} z ${total}…`);
+      if (n === 1 || n % 5 === 0 || n === total) showBusy(t('readingPage', { n, total }));
     },
   });
-  showBusy('Szukam rozdziałów…');
+  showBusy(t('findingSections'));
   await new Promise((r) => setTimeout(r, 0));
   return buildDocument(raw);
 }
 
 async function importBlob(blob, name = 'dokument.pdf') {
   ui.error = '';
-  showBusy('Otwieram plik…');
+  showBusy(t('opening'));
   try {
     const bytes = new Uint8Array(await blob.arrayBuffer());
     if (!isPdf(bytes)) throw new Error('not-pdf');
@@ -156,7 +155,7 @@ async function importBlob(blob, name = 'dokument.pdf') {
       await L.putDoc(record);
       L.persist();
     } catch {
-      ui.error = 'Nie udało się zapisać PDF-u w pamięci przeglądarki; zniknie po zamknięciu strony.';
+      ui.error = t('saveFailed');
     }
     ui.busy = '';
     openDoc(record);
@@ -168,20 +167,20 @@ async function importBlob(blob, name = 'dokument.pdf') {
 }
 
 function importError(err) {
-  if (err instanceof NoTextError) return 'Ten PDF nie ma warstwy tekstowej (to skan). Lektor nie rozpoznaje tekstu na obrazach.';
-  if (err?.name === 'PasswordException') return 'Ten PDF jest chroniony hasłem.';
-  if (err?.message === 'not-pdf' || err?.name === 'InvalidPDFException') return 'To nie jest plik PDF albo jest uszkodzony.';
-  return `Nie udało się odczytać PDF-u (${err?.message || err}).`;
+  if (err instanceof NoTextError) return t('noText');
+  if (err?.name === 'PasswordException') return t('password');
+  if (err?.message === 'not-pdf' || err?.name === 'InvalidPDFException') return t('notPdf');
+  return t('readFailed', { error: err?.message || err });
 }
 
 async function importUrl(input) {
   const url = pdfUrl(input);
   if (!url) {
-    ui.error = 'Wklej adres PDF-u (https://…) albo numer arXiv, np. 1706.03762.';
+    ui.error = t('badUrl');
     return render();
   }
   ui.error = '';
-  showBusy('Pobieram PDF…');
+  showBusy(t('downloading'));
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -192,8 +191,8 @@ async function importUrl(input) {
     ui.busy = '';
     ui.error =
       err instanceof TypeError
-        ? 'Ten serwer nie pozwala pobierać plików z innych stron. Pobierz PDF i otwórz go przyciskiem „Otwórz PDF”.'
-        : `Nie udało się pobrać PDF-u (${err.message}).`;
+        ? t('cors')
+        : t('fetchFailed', { error: err.message });
     render();
   }
 }
@@ -241,7 +240,7 @@ async function openDoc(record) {
   history.pushState({ view: 'reader' }, '');
   render();
   scrollToCurrent(true);
-  if (!record.model.sections.length) setAnswer('Nie znalazłem rozdziałów w tym PDF-ie; da się czytać od początku albo od wybranego miejsca.');
+  if (!record.model.sections.length) setAnswer(t('noSections'));
 }
 
 /** Plans what to read; puts the player at `pos` ({ b, i }) or the start. */
@@ -274,12 +273,12 @@ function playSection(k, announce = true) {
   const start = ui.firstUnitOfBlock[s.b];
   const stop = ui.firstUnitOfBlock[sectionEnd(doc, k)];
   if (start >= stop) {
-    setAnswer(`„${s.t}” nie ma tekstu do czytania (same tabele, wzory albo przypisy).`);
+    setAnswer(t('emptySection', { title: s.t }));
     return;
   }
   ui.followUntil = 0;
   player.play(start, { end: prefs.stopAtEnd ? stop : null });
-  if (announce) setAnswer(`Czytam: ${s.t}${prefs.stopAtEnd ? '' : ' i dalej'}`);
+  if (announce) setAnswer(t(prefs.stopAtEnd ? 'reading' : 'readingOn', { title: s.t }));
   scrollToCurrent(true);
 }
 
@@ -287,10 +286,10 @@ function playPage(page) {
   const doc = ui.record.model;
   const b = doc.blocks.findIndex((x) => x.p >= page);
   const start = b < 0 ? ui.units.length : ui.firstUnitOfBlock[b];
-  if (start >= ui.units.length) return setAnswer(`Na stronie ${page} i dalej nie ma tekstu do czytania.`);
+  if (start >= ui.units.length) return setAnswer(t('nothingFromPage', { page: pageLabel(page) }));
   ui.followUntil = 0;
   player.play(start);
-  setAnswer(`Czytam od strony ${pageLabel(page)}.`);
+  setAnswer(t('fromPage', { page: pageLabel(page) }));
   scrollToCurrent(true);
 }
 
@@ -339,7 +338,7 @@ function ask(text) {
     playPage(r.page);
   } else {
     ui.suggestions = r.suggestions;
-    setAnswer(r.suggestions.length ? `Nie znalazłem „${q}”. Może chodzi o:` : `Nie znalazłem „${q}”. Wybierz rozdział ze spisu.`);
+    setAnswer(t(r.suggestions.length ? 'notFoundSuggest' : 'notFound', { q }));
     renderAsk();
     if (!r.suggestions.length && doc.sections.length) openToc();
   }
@@ -402,8 +401,8 @@ function listen() {
     ask(hit);
   };
   recognition.onerror = (e) => {
-    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') setAnswer('Brak dostępu do mikrofonu.');
-    else if (e.error === 'no-speech') setAnswer('Nic nie usłyszałem.');
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') setAnswer(t('micDenied'));
+    else if (e.error === 'no-speech') setAnswer(t('heardNothing'));
   };
   recognition.onend = () => {
     ui.listening = false;
@@ -535,8 +534,8 @@ function renderLibrary() {
     .map((d) => {
       const meta = [
         d.author ? esc(d.author.length > 60 ? `${d.author.slice(0, 57)}…` : d.author) : '',
-        `${d.pages} str.`,
-        d.progress > 0.01 ? `przeczytane ${Math.round(d.progress * 100)}%` : '',
+        t('pages', { n: d.pages }),
+        d.progress > 0.01 ? t('readPercent', { n: Math.round(d.progress * 100) }) : '',
       ]
         .filter(Boolean)
         .join(' · ');
@@ -549,8 +548,8 @@ function renderLibrary() {
         </button>
         ${
           confirm
-            ? `<span class="confirm"><button class="btn small danger" data-delete="${esc(d.id)}">Usuń</button><button class="btn small" data-cancel>Anuluj</button></span>`
-            : `<button class="icon-btn small" data-ask-delete="${esc(d.id)}" aria-label="Usuń „${esc(d.title)}”">${ICON.trash}</button>`
+            ? `<span class="confirm"><button class="btn small danger" data-delete="${esc(d.id)}">${t('delete')}</button><button class="btn small" data-cancel>${t('cancel')}</button></span>`
+            : `<button class="icon-btn small" data-ask-delete="${esc(d.id)}" aria-label="${esc(t('deleteTitle', { title: d.title }))}">${ICON.trash}</button>`
         }
       </li>`;
     })
@@ -558,20 +557,20 @@ function renderLibrary() {
   app.innerHTML = `
     <header class="bar">
       <h1>Lektor</h1>
-      <div class="bar-actions"><button class="icon-btn" data-settings aria-label="Ustawienia">${ICON.gear}</button></div>
+      <div class="bar-actions"><button class="icon-btn" data-settings aria-label="${t('settings')}">${ICON.gear}</button></div>
     </header>
     <section class="open-box" id="drop">
-      <p class="lead">Czyta na głos artykuły, prace dyplomowe i inne PDF-y: całe albo wybrany rozdział.</p>
-      <label class="btn primary big">${ICON.file}<span>Otwórz PDF</span><input type="file" id="file" accept="application/pdf,.pdf" hidden></label>
+      <p class="lead">${t('lead')}</p>
+      <label class="btn primary big">${ICON.file}<span>${t('open')}</span><input type="file" id="file" accept="application/pdf,.pdf" hidden></label>
       <form class="url-form" id="url-form">
-        <input type="text" id="url" inputmode="url" autocomplete="off" placeholder="albo adres PDF-u lub numer arXiv" aria-label="Adres PDF-u lub numer arXiv">
-        <button class="btn" type="submit">Pobierz</button>
+        <input type="text" id="url" inputmode="url" autocomplete="off" placeholder="${t('urlPlaceholder')}" aria-label="${t('urlLabel')}">
+        <button class="btn" type="submit">${t('fetch')}</button>
       </form>
       ${ui.busy ? `<p class="busy" id="busy" role="status">${esc(ui.busy)}</p>` : ''}
       ${ui.error ? `<p class="error" role="alert">${esc(ui.error)}</p>` : ''}
-      ${synth ? '' : '<p class="error">Ta przeglądarka nie ma syntezy mowy, więc Lektor nie przeczyta tekstu na głos.</p>'}
+      ${synth ? '' : `<p class="error">${t('noSynthesis')}</p>`}
     </section>
-    ${docs ? `<h2 class="list-head">Ostatnio czytane</h2><ul class="docs">${docs}</ul>` : '<p class="empty">PDF-y, które otworzysz, zostają na tym urządzeniu.</p>'}
+    ${docs ? `<h2 class="list-head">${t('recent')}</h2><ul class="docs">${docs}</ul>` : `<p class="empty">${t('emptyLibrary')}</p>`}
   `;
 }
 
@@ -584,12 +583,12 @@ function renderReader() {
   document.title = `${record.title} – Lektor`;
   app.innerHTML = `
     <header class="bar reader-bar">
-      <button class="icon-btn" data-home aria-label="Biblioteka">${ICON.back}</button>
+      <button class="icon-btn" data-home aria-label="${t('library')}">${ICON.back}</button>
       <div class="doc-head"><h1 title="${esc(record.title)}">${esc(record.title)}</h1>
-        <span class="doc-meta">${record.model.pages} str. · ${esc(LANG_NAMES[record.model.lang] || record.model.lang || 'język nieznany')} · ${record.model.sections.length} rozdz.</span></div>
+        <span class="doc-meta">${esc(t('docMeta', { pages: record.model.pages, lang: languageName(record.model.lang) || t('unknownLang'), sections: record.model.sections.length }))}</span></div>
       <div class="bar-actions">
-        <button class="icon-btn" data-toc aria-label="Spis treści">${ICON.list}</button>
-        <button class="icon-btn" data-settings aria-label="Ustawienia">${ICON.gear}</button>
+        <button class="icon-btn" data-toc aria-label="${t('contents')}">${ICON.list}</button>
+        <button class="icon-btn" data-settings aria-label="${t('settings')}">${ICON.gear}</button>
       </div>
     </header>
     <article class="text" id="text">${renderText()}</article>
@@ -610,9 +609,9 @@ function renderAsk() {
     ${ui.suggestions.length ? `<div class="chips">${ui.suggestions.map((k) => `<button class="chip" data-section="${k}">${esc(sectionTitle(k))}</button>`).join('')}</div>` : ''}
     <form class="ask" id="ask-form" role="search">
       <input id="ask-input" type="text" autocomplete="off" enterkeyhint="go" value="${esc(value)}"
-        placeholder="${Recognition ? 'Powiedz albo wpisz: ' : 'Np. '}„rozdział 2”, „metody”, „3.1”" aria-label="Czego posłuchać? Np. rozdział 2, metody, 3.1, strona 10">
-      ${Recognition ? `<button type="button" class="icon-btn${ui.listening ? ' listening' : ''}" data-listen aria-label="${ui.listening ? 'Słucham… (zatrzymaj)' : 'Powiedz, czego posłuchać'}">${ICON.mic}</button>` : ''}
-      <button type="submit" class="btn primary">Czytaj</button>
+        placeholder="${esc(t(Recognition ? 'askVoice' : 'askTyped'))}" aria-label="${esc(t('askLabel'))}">
+      ${Recognition ? `<button type="button" class="icon-btn${ui.listening ? ' listening' : ''}" data-listen aria-label="${t(ui.listening ? 'listening' : 'speak')}">${ICON.mic}</button>` : ''}
+      <button type="submit" class="btn primary">${t('read')}</button>
     </form>`;
 }
 
@@ -627,10 +626,10 @@ function openToc() {
     .join('');
   tocSheet.innerHTML = `
     <div class="toc">
-      <div class="sheet-head"><h2>Spis treści</h2>
-        <span><button class="btn small" data-from-start>Od początku</button><button class="icon-btn" data-close aria-label="Zamknij">${ICON.close}</button></span></div>
-      ${items ? `<ul>${items}</ul>` : '<p class="empty">Ten PDF nie ma rozpoznanych rozdziałów.</p>'}
-      <p class="hint">${doc.outline ? 'Rozdziały z zakładek PDF-u.' : 'Rozdziały rozpoznane po wyglądzie nagłówków.'} Dotknij, żeby posłuchać${prefs.stopAtEnd ? ' (do końca rozdziału)' : ''}.</p>
+      <div class="sheet-head"><h2>${t('contents')}</h2>
+        <span><button class="btn small" data-from-start>${t('fromStart')}</button><button class="icon-btn" data-close aria-label="${t('close')}">${ICON.close}</button></span></div>
+      ${items ? `<ul>${items}</ul>` : `<p class="empty">${t('noContents')}</p>`}
+      <p class="hint">${t(doc.outline ? 'fromOutline' : 'fromLook')} ${t(prefs.stopAtEnd ? 'tapToEnd' : 'tap')}</p>
     </div>`;
   tocSheet.showModal();
   tocSheet.querySelector('.current')?.scrollIntoView({ block: 'center' });
@@ -642,8 +641,7 @@ function renderText() {
   doc.blocks.forEach((block, b) => {
     const read = readable(block, prefs);
     if (!read) {
-      const label = KIND_LABEL[block.k] || block.k;
-      out.push(`<p class="skipped k-${block.k}" data-b="${b}"><span class="tag">${esc(label)}</span>${esc(block.t)}</p>`);
+      out.push(`<p class="skipped k-${block.k}" data-b="${b}"><span class="tag">${t(`kind.${block.k}`)}</span>${esc(block.t)}</p>`);
       return;
     }
     const spans = pieces(block)
@@ -656,6 +654,7 @@ function renderText() {
       const level = Math.min((block.l || 1) + 1, 5);
       out.push(`<h${level} data-b="${b}">${spans}</h${level}>`);
     } else if (block.k === 'title') out.push(`<p class="doc-title-block" data-b="${b}">${spans}</p>`);
+    else if (block.k === 'caption' || block.k === 'note') out.push(`<p class="k-${block.k}" data-b="${b}"><span class="tag">${t(`kind.${block.k}`)}</span>${spans}</p>`);
     else out.push(`<p class="k-${block.k}" data-b="${b}">${spans}</p>`);
   });
   return out.join('\n');
@@ -668,18 +667,18 @@ function renderPlayer() {
   const sec = unit ? doc.sections[unit.sec] : null;
   const page = unit ? doc.blocks[unit.b]?.p : null;
   const playing = player.state === 'playing';
-  const until = player.end != null && playing ? ' · do końca rozdziału' : '';
+  const until = player.end != null && playing ? ` · ${t('untilEnd')}` : '';
   const box = document.getElementById('bar-play');
   if (!box) return;
   box.innerHTML = `
-      <div class="now-line"><span class="now-title">${esc(sec?.t || ui.record.title)}</span><span class="now-meta">${page ? `str. ${esc(pageLabel(page))}` : ''}${until}</span></div>
+      <div class="now-line"><span class="now-title">${esc(sec?.t || ui.record.title)}</span><span class="now-meta">${page ? esc(t('page', { page: pageLabel(page) })) : ''}${until}</span></div>
       <div class="controls">
-        <button class="icon-btn" data-prev-section aria-label="Poprzedni rozdział">${ICON.prevSec}</button>
-        <button class="icon-btn" data-step="-1" aria-label="Poprzednie zdanie">${ICON.back10}</button>
-        <button class="play" data-toggle aria-label="${playing ? 'Pauza' : 'Czytaj'}">${playing ? ICON.pause : ICON.play}</button>
-        <button class="icon-btn" data-step="1" aria-label="Następne zdanie">${ICON.fwd10}</button>
-        <button class="icon-btn" data-next-section aria-label="Następny rozdział">${ICON.nextSec}</button>
-        <button class="rate" data-rate aria-label="Tempo">${String(prefs.rate).replace('.', ',')}×</button>
+        <button class="icon-btn" data-prev-section aria-label="${t('prevSection')}">${ICON.prevSec}</button>
+        <button class="icon-btn" data-step="-1" aria-label="${t('prevSentence')}">${ICON.back10}</button>
+        <button class="play" data-toggle aria-label="${t(playing ? 'pause' : 'play')}">${playing ? ICON.pause : ICON.play}</button>
+        <button class="icon-btn" data-step="1" aria-label="${t('nextSentence')}">${ICON.fwd10}</button>
+        <button class="icon-btn" data-next-section aria-label="${t('nextSection')}">${ICON.nextSec}</button>
+        <button class="rate" data-rate aria-label="${t('speed')}">${decimal(prefs.rate)}×</button>
       </div>`;
 }
 
@@ -693,101 +692,108 @@ function renderSettings() {
     `<label class="check"><input type="checkbox" data-pref="${key}"${prefs[key] ? ' checked' : ''}><span>${label}${hint ? `<small>${hint}</small>` : ''}</span></label>`;
   sheet.innerHTML = `
     <form method="dialog" class="settings">
-      <div class="sheet-head"><h2>Ustawienia</h2><button class="icon-btn" value="close" aria-label="Zamknij">${ICON.close}</button></div>
-      <label class="field"><span>Głos${ui.record ? ` (język dokumentu: ${esc(LANG_NAMES[lang] || lang)})` : ''}</span>
-        <select id="voice">
-          ${voices.length ? '' : '<option value="">Brak głosów w systemie</option>'}
-          ${mine.length ? `<optgroup label="${esc(LANG_NAMES[lang] || lang)}">${mine.map(option).join('')}</optgroup>` : ''}
-          ${others.length ? `<optgroup label="Inne języki">${others.map(option).join('')}</optgroup>` : ''}
+      <div class="sheet-head"><h2>${t('settings')}</h2><button class="icon-btn" value="close" aria-label="${t('close')}">${ICON.close}</button></div>
+      <label class="field"><span>${t('interfaceLang')}</span>
+        <select id="ui-lang">
+          ${[['', t('automatic', { lang: languageName(chooseLanguage('', navigator.language)) })], ['pl', 'Polski'], ['en', 'English']]
+            .map(([v, l]) => `<option value="${v}"${prefs.uiLang === v ? ' selected' : ''}>${esc(l)}</option>`)
+            .join('')}
         </select>
       </label>
-      <label class="field"><span>Tempo: <b id="rate-value">${String(prefs.rate).replace('.', ',')}×</b></span>
+      <label class="field"><span>${ui.record ? esc(t('voiceFor', { lang: languageName(lang) })) : t('voice')}</span>
+        <select id="voice">
+          ${voices.length ? '' : `<option value="">${t('noVoices')}</option>`}
+          ${mine.length ? `<optgroup label="${esc(languageName(lang))}">${mine.map(option).join('')}</optgroup>` : ''}
+          ${others.length ? `<optgroup label="${t('otherLangs')}">${others.map(option).join('')}</optgroup>` : ''}
+        </select>
+      </label>
+      <label class="field"><span>${t('speed')}: <b id="rate-value">${decimal(prefs.rate)}×</b></span>
         <input type="range" id="rate" min="0.6" max="2.5" step="0.05" value="${prefs.rate}">
       </label>
       <fieldset>
-        <legend>Co czytać</legend>
-        ${check('readCaptions', 'Podpisy rysunków i tabel')}
-        ${check('readNotes', 'Przypisy')}
-        ${check('readCitations', 'Odwołania do literatury', '„(Smith i in., 2020)”, „[12]” — domyślnie pomijane')}
-        ${check('readReferences', 'Bibliografię przy czytaniu po kolei', 'wybrana wprost jest czytana zawsze')}
+        <legend>${t('whatToRead')}</legend>
+        ${check('readCaptions', t('readCaptions'))}
+        ${check('readNotes', t('readNotes'))}
+        ${check('readCitations', t('readCitations'), t('readCitationsHint'))}
+        ${check('readReferences', t('readReferences'), t('readReferencesHint'))}
       </fieldset>
       <fieldset>
-        <legend>Czytanie</legend>
-        ${check('stopAtEnd', 'Wybrany rozdział czytaj do końca i zatrzymaj się')}
-        ${check('keepAwake', 'Nie wygaszaj ekranu podczas czytania', 'na telefonach czytanie często staje po wygaszeniu ekranu')}
+        <legend>${t('readingGroup')}</legend>
+        ${check('stopAtEnd', t('stopAtEnd'))}
+        ${check('keepAwake', t('keepAwake'), t('keepAwakeHint'))}
       </fieldset>
       ${
         Recognition
-          ? `<label class="field"><span>Język poleceń głosowych</span>
+          ? `<label class="field"><span>${t('askLang')}</span>
         <select id="ask-lang">
-          ${[['', `jak w przeglądarce (${esc(navigator.language)})`], ['pl-PL', 'polski'], ['en-US', 'angielski'], ['nl-NL', 'niderlandzki']]
-            .map(([v, l]) => `<option value="${v}"${prefs.askLang === v ? ' selected' : ''}>${l}</option>`)
+          ${[['', t('asBrowser', { lang: navigator.language })], ['pl-PL', languageName('pl')], ['en-US', languageName('en')], ['nl-NL', languageName('nl')]]
+            .map(([v, l]) => `<option value="${v}"${prefs.askLang === v ? ' selected' : ''}>${esc(l)}</option>`)
             .join('')}
         </select></label>`
           : ''
       }
-      <p class="hint">Głosy pochodzą z systemu. Lepsze brzmią naturalniej: na iPhonie Ustawienia → Dostępność → Treść mówiona → Głosy (pobierz wersję „Ulepszony” lub „Premium”); na Androidzie Ustawienia → Zamiana tekstu na mowę; w Chrome na komputerze są głosy „Google”, w Edge „Natural”.</p>
+      <p class="hint">${t('voicesHint')}</p>
     </form>`;
 }
 
 // ---------- events ----------
 
 app.addEventListener('click', (e) => {
-  const t = e.target.closest('button, [data-u]');
-  if (!t) return;
-  if (t.dataset.open) {
-    L.getDoc(t.dataset.open).then((r) => r && openDoc(r));
-  } else if (t.dataset.askDelete) {
-    ui.confirmDelete = t.dataset.askDelete;
+  const el = e.target.closest('button, [data-u]');
+  if (!el) return;
+  if (el.dataset.open) {
+    L.getDoc(el.dataset.open).then((r) => r && openDoc(r));
+  } else if (el.dataset.askDelete) {
+    ui.confirmDelete = el.dataset.askDelete;
     render();
-  } else if (t.dataset.delete) {
-    removeDoc(t.dataset.delete);
-  } else if ('cancel' in t.dataset) {
+  } else if (el.dataset.delete) {
+    removeDoc(el.dataset.delete);
+  } else if ('cancel' in el.dataset) {
     ui.confirmDelete = null;
     render();
-  } else if ('settings' in t.dataset) {
+  } else if ('settings' in el.dataset) {
     renderSettings();
     sheet.showModal();
-  } else if ('home' in t.dataset) {
+  } else if ('home' in el.dataset) {
     history.back();
-  } else if ('toc' in t.dataset) {
+  } else if ('toc' in el.dataset) {
     openToc();
-  } else if (t.dataset.u != null) {
+  } else if (el.dataset.u != null) {
     // A tap on a sentence reads from there on.
     ui.followUntil = 0;
-    player.play(Number(t.dataset.u));
+    player.play(Number(el.dataset.u));
   }
 });
 
 bar.addEventListener('click', (e) => {
-  const t = e.target.closest('button');
-  if (!t) return;
-  if (t.dataset.section != null) {
+  const el = e.target.closest('button');
+  if (!el) return;
+  if (el.dataset.section != null) {
     ui.suggestions = [];
-    playSection(Number(t.dataset.section));
-  } else if ('listen' in t.dataset) listen();
-  else if ('toggle' in t.dataset) {
+    playSection(Number(el.dataset.section));
+  } else if ('listen' in el.dataset) listen();
+  else if ('toggle' in el.dataset) {
     ui.followUntil = 0;
     if (player.state !== 'playing') scrollToCurrent(false);
     player.toggle();
-  } else if (t.dataset.step) player.step(Number(t.dataset.step));
-  else if ('prevSection' in t.dataset) nextSection(-1);
-  else if ('nextSection' in t.dataset) nextSection(1);
-  else if ('rate' in t.dataset) {
+  } else if (el.dataset.step) player.step(Number(el.dataset.step));
+  else if ('prevSection' in el.dataset) nextSection(-1);
+  else if ('nextSection' in el.dataset) nextSection(1);
+  else if ('rate' in el.dataset) {
     const i = RATES.findIndex((r) => r >= prefs.rate - 0.001);
     setRate(RATES[(i + 1) % RATES.length]);
   }
 });
 
 tocSheet.addEventListener('click', (e) => {
-  const t = e.target.closest('button');
+  const el = e.target.closest('button');
   if (e.target === tocSheet) return tocSheet.close(); // a tap outside the sheet
-  if (!t) return;
+  if (!el) return;
   tocSheet.close();
-  if (t.dataset.section != null) {
+  if (el.dataset.section != null) {
     ui.suggestions = [];
-    playSection(Number(t.dataset.section));
-  } else if ('fromStart' in t.dataset) {
+    playSection(Number(el.dataset.section));
+  } else if ('fromStart' in el.dataset) {
     ui.followUntil = 0;
     player.play(0);
     setAnswer('');
@@ -819,22 +825,28 @@ app.addEventListener('change', (e) => {
 });
 
 sheet.addEventListener('change', (e) => {
-  const t = e.target;
-  if (t.id === 'voice') {
-    prefs.voices[docLang()] = t.value;
+  const el = e.target;
+  if (el.id === 'voice') {
+    prefs.voices[docLang()] = el.value;
     savePrefs();
     applyVoice();
     if (player.state !== 'playing' && ui.record) {
       // Let the new voice say something.
       player.play(player.index, { end: player.index + 1 });
     }
-  } else if (t.id === 'ask-lang') {
-    prefs.askLang = t.value;
+  } else if (el.id === 'ui-lang') {
+    prefs.uiLang = el.value;
     savePrefs();
-  } else if (t.dataset.pref) {
-    prefs[t.dataset.pref] = t.checked;
+    applyLanguage();
+    renderSettings();
+    render();
+  } else if (el.id === 'ask-lang') {
+    prefs.askLang = el.value;
     savePrefs();
-    if (ui.record && t.dataset.pref in DEFAULT_OPTIONS) {
+  } else if (el.dataset.pref) {
+    prefs[el.dataset.pref] = el.checked;
+    savePrefs();
+    if (ui.record && el.dataset.pref in DEFAULT_OPTIONS) {
       const unit = currentUnit();
       const playing = player.state === 'playing';
       buildUnits(unit ? { b: unit.b, i: unit.i } : null);
@@ -846,7 +858,7 @@ sheet.addEventListener('change', (e) => {
 
 sheet.addEventListener('input', (e) => {
   if (e.target.id === 'rate') {
-    document.getElementById('rate-value').textContent = `${String(Number(e.target.value)).replace('.', ',')}×`;
+    document.getElementById('rate-value').textContent = `${decimal(Number(e.target.value))}×`;
   }
 });
 

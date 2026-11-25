@@ -1,5 +1,7 @@
 # Lektor
 
+*Reads PDFs aloud — papers, theses, reports — whole or the chapter you ask for (“chapter 3”, “methods”, “3.2”, “page 40”). The interface is in English and Polish.*
+
 Czyta na głos PDF-y: artykuły, prace dyplomowe, raporty. Cały tekst albo wybrany rozdział: wystarczy wpisać lub powiedzieć „rozdział 3”, „metody”, „3.2” albo „strona 40”. Działa w przeglądarce telefonu i komputera, da się go zainstalować (PWA) i po pierwszym otwarciu działa bez internetu. PDF-y zostają na urządzeniu.
 
 Szkic. Struktura jest sprawdzona na pięciu prawdziwych PDF-ach (niżej), czytanie w przeglądarce na zastępczym syntezatorze; na telefonie z prawdziwymi głosami jeszcze nie.
@@ -16,6 +18,7 @@ Szkic. Struktura jest sprawdzona na pięciu prawdziwych PDF-ach (niżej), czytan
   Mikrofon obok pola (Chrome, Edge, Safari) przyjmuje to samo głosem. Spis treści pod ikoną listy; dotknięcie zdania w tekście czyta od niego.
 - **Czytanie.** Wybrany rozdział jest czytany do końca i czytanie staje (da się wyłączyć). Odtwarzacz: poprzedni/następny rozdział, poprzednie/następne zdanie, tempo. Czytane zdanie jest podświetlone, tekst przewija się sam. Słuchawki i ekran blokady sterują przez Media Session tam, gdzie przeglądarka to pozwala. Miejsce, w którym czytanie stanęło, jest zapamiętane.
 - **Co jest pomijane.** Nagłówki i numery stron, znaki wodne, przypisy, podpisy rysunków, tabele, wzory, spisy treści, odwołania do literatury („(Smith i in., 2020)”, „[12]”), a przy czytaniu po kolei także bibliografia. Przypisy, podpisy, odwołania i bibliografię można włączyć w ustawieniach. Pominięte fragmenty są widoczne w tekście, przygaszone.
+- **Język interfejsu:** polski albo angielski, w ustawieniach („Język / Language”); domyślnie polski w przeglądarce ustawionej na polski, angielski w pozostałych. Prośby są rozumiane w obu językach niezależnie od tego ustawienia.
 - **Głosy** pochodzą z systemu (Web Speech API); aplikacja wybiera najlepszy dla języka dokumentu („Natural”, „Premium”, „Enhanced”), w ustawieniach można wybrać inny.
 
 ## Skąd się biorą rozdziały
@@ -59,6 +62,7 @@ node tools/inspect.mjs paper.pdf
 | `js/player.js` | czytanie zdanie po zdaniu przez Web Speech API, wybór głosu |
 | `js/library.js` | IndexedDB: PDF-y, ich struktura, miejsce czytania |
 | `js/app.js` | widoki i zdarzenia |
+| `js/i18n.js` | teksty interfejsu po polsku i po angielsku |
 | `sw.js` | praca bez internetu, odbieranie udostępnionych PDF-ów |
 | `tools/inspect.mjs` | podgląd struktury PDF-u w terminalu |
 

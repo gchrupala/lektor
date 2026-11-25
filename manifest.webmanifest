@@ -1,8 +1,7 @@
 {
   "name": "Lektor",
   "short_name": "Lektor",
-  "description": "Czyta na głos artykuły, prace dyplomowe i inne PDF-y, cały tekst albo wybrany rozdział.",
-  "lang": "pl",
+  "description": "Reads papers, theses and other PDFs aloud, whole or by chapter. Czyta na głos artykuły i prace dyplomowe, całe albo wybrany rozdział.",
   "id": "./",
   "start_url": "./",
   "scope": "./",
