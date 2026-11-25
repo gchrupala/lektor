@@ -1,0 +1,12 @@
+{
+  "name": "lektor",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Czyta na głos artykuły, prace dyplomowe i inne PDF-y, cały tekst albo wybrany rozdział.",
+  "type": "module",
+  "scripts": {
+    "start": "npx --yes serve -l 8080 .",
+    "test": "node --test test/*.test.js",
+    "inspect": "node tools/inspect.mjs"
+  }
+}
